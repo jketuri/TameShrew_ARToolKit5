@@ -41,7 +41,8 @@
 #include <AR/video.h>
 
 
-main()
+int main()
 {
     ar2VideoOpen("-module=1394 -listCamera");
+    return 0;
 }

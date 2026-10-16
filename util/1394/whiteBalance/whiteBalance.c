@@ -52,6 +52,7 @@
 #include <AR/gsub.h>
 #include <AR/video.h>
 #include <AR/ar.h>
+#include <ARUtil/time.h>
 
 ARGViewportHandle  *vp;
 int                 xsize, ysize;
@@ -66,7 +67,7 @@ static void   mainLoop(void);
 static void   draw( void );
 static void   dispAvaragePixelValue(void);
 
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     init(argc, argv);
 
@@ -74,6 +75,7 @@ main(int argc, char *argv[])
     argSetDispFunc( mainLoop, 1 );
     argSetKeyFunc( keyEvent );
     argMainLoop();
+    return 0;
 }
 
 static void   keyEvent( unsigned char key, int x, int y)

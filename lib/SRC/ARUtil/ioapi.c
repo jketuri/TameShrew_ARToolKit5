@@ -13,6 +13,7 @@
    See the accompanying LICENSE file for the full text of the license.
 */
 
+#define _LARGEFILE64_SOURCE
 #include <stdlib.h>
 #include <string.h>
 

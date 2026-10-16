@@ -76,6 +76,8 @@
 //	Public includes.
 // ============================================================================
 
+#define GL_GLEXT_PROTOTYPES
+
 #ifdef __APPLE__
 #  include <OpenGL/gl.h>
 #else

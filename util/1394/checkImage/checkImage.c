@@ -51,6 +51,7 @@
 #include <AR/ar.h>
 #include <AR/gsub.h>
 #include <AR/video.h>
+#include <ARUtil/time.h>
 
 #define             PATT_NAME        "../share/checkImage/Data/hiro.patt"
 
@@ -75,7 +76,7 @@ static void   draw( double trans[3][4] );
 static void   keyEvent( unsigned char key, int x, int y);
 
 
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     init(argc, argv);
 
@@ -86,6 +87,7 @@ main(int argc, char *argv[])
     fps[0] = '\0';
     arUtilTimer();
     argMainLoop();
+    return 0;
 }
 
 static void   keyEvent( unsigned char key, int x, int y)

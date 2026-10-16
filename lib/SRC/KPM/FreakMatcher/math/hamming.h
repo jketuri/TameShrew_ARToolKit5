@@ -34,6 +34,7 @@
 //
 
 #pragma once
+#include <limits>
 
 namespace vision {
     

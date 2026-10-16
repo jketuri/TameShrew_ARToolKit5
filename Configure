@@ -289,7 +289,7 @@ then
             LDFLAG="-L/usr/lib/x86_64-linux-gnu -L/usr/lib64"
             ;;
         *)
-            CFLAG="$CFLAG -I/usr/include/i386-linux-gnu"
+            CFLAG="$CFLAG -I/usr/include/i386-linux-gnu -I/usr/include/opencv4"
             LDFLAG="-L/usr/lib/i386-linux-gnu -L/usr/lib"
             ;;
     esac
