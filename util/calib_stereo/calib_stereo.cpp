@@ -51,14 +51,17 @@
 #  include <sys/param.h> // MAXPATHLEN
 #  include <unistd.h> // getcwd
 #endif
+#include <vector>
 #ifdef __APPLE__
 #  include <OpenGL/gl.h>
-#  include "opencv2/calib3d/calib3d_c.h"
 #elif defined(__linux) || defined(_WIN32)
 #  include <GL/gl.h>
-#  include "opencv2/calib3d/calib3d.hpp"
 #endif
-#include <opencv/cv.hpp>
+// OpenCV 4: the legacy C API (opencv/cv.hpp, IplImage, CvPoint2D32f, cvFind*) has been removed,
+// so use the C++ API. OpenCV headers are included before the AR headers to avoid macro clashes.
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/calib3d.hpp>
 #include <AR/ar.h>
 #include <AR/gsub.h>
 #include <AR/video.h>
@@ -80,10 +83,10 @@ int                  calibImageNum        = 0;
 int                  capturedImageNum     = 0;
 float                patternWidth         = 0.0f;
 int                  cornerFlag           = 0;
-CvPoint2D32f        *cornersL;
-CvPoint2D32f        *cornersR;
-IplImage            *calibImageL;
-IplImage            *calibImageR;
+std::vector<cv::Point2f> cornersL;
+std::vector<cv::Point2f> cornersR;
+cv::Mat              calibImageL;
+cv::Mat              calibImageR;
 ICPCalibDataT       *calibData;
 ICP3DCoordT         *worldCoord;
 
@@ -308,10 +311,11 @@ static void init(int argc, char *argv[])
     argViewportSetDispMode(vpR, AR_GL_DISP_MODE_FIT_TO_VIEWPORT_KEEP_ASPECT_RATIO);
 
 
-    calibImageL = cvCreateImage( cvSize(xsizeL, ysizeL), IPL_DEPTH_8U, 1);
-    calibImageR = cvCreateImage( cvSize(xsizeR, ysizeR), IPL_DEPTH_8U, 1);
-    arMalloc(cornersL, CvPoint2D32f, chessboardCornerNumX*chessboardCornerNumY);
-    arMalloc(cornersR, CvPoint2D32f, chessboardCornerNumX*chessboardCornerNumY);
+    // Freshly-created cv::Mat objects are continuous, so .data can be filled as a packed ysize x xsize buffer.
+    calibImageL.create( ysizeL, xsizeL, CV_8UC1 );
+    calibImageR.create( ysizeR, xsizeR, CV_8UC1 );
+    cornersL.reserve(chessboardCornerNumX*chessboardCornerNumY);
+    cornersR.reserve(chessboardCornerNumX*chessboardCornerNumY);
     arMalloc(worldCoord, ICP3DCoordT, chessboardCornerNumX*chessboardCornerNumY);
     for( i = 0; i < chessboardCornerNumX; i++ ) {
         for( j = 0; j < chessboardCornerNumY; j++ ) {
@@ -351,15 +355,17 @@ static void  keyEvent( unsigned char key, int x, int y)
         cleanup();
     }
     
-    if( cornerFlag && key==' ' ) {  
-        cvFindCornerSubPix( calibImageL, cornersL, chessboardCornerNumX*chessboardCornerNumY, cvSize(5,5),
-                            cvSize(-1,-1), cvTermCriteria(CV_TERMCRIT_ITER, 100, 0.1)  );
+    if( cornerFlag && key==' '
+        && cornersL.size() == (size_t)(chessboardCornerNumX*chessboardCornerNumY)
+        && cornersR.size() == (size_t)(chessboardCornerNumX*chessboardCornerNumY) ) {
+        cv::cornerSubPix( calibImageL, cornersL, cv::Size(5,5), cv::Size(-1,-1),
+                          cv::TermCriteria(cv::TermCriteria::COUNT, 100, 0.1) );
         for( i = 0; i < chessboardCornerNumX*chessboardCornerNumY; i++ ) {
             arParamObserv2Ideal(paramL.dist_factor, (double)cornersL[i].x, (double)cornersL[i].y,
                                 &calibData[capturedImageNum].screenCoordL[i].x, &calibData[capturedImageNum].screenCoordL[i].y, paramL.dist_function_version);
         }
-        cvFindCornerSubPix( calibImageR, cornersR, chessboardCornerNumX*chessboardCornerNumY, cvSize(5,5),
-                            cvSize(-1,-1), cvTermCriteria(CV_TERMCRIT_ITER, 100, 0.1)  );
+        cv::cornerSubPix( calibImageR, cornersR, cv::Size(5,5), cv::Size(-1,-1),
+                          cv::TermCriteria(cv::TermCriteria::COUNT, 100, 0.1) );
         for( i = 0; i < chessboardCornerNumX*chessboardCornerNumY; i++ ) {
             arParamObserv2Ideal(paramR.dist_factor, (double)cornersR[i].x, (double)cornersR[i].y,
                                 &calibData[capturedImageNum].screenCoordR[i].x, &calibData[capturedImageNum].screenCoordR[i].y, paramR.dist_function_version);
@@ -385,8 +391,8 @@ static void mainLoop( void )
     AR2VideoBufferT *videoBuffR;
     ARUint8         *dataPtrL;
     ARUint8         *dataPtrR;
-    int              cornerFlagL;
-    int              cornerFlagR;
+    bool             cornerFlagL;
+    bool             cornerFlagR;
     int              cornerCountL;
     int              cornerCountR;
     char             buf[256];
@@ -419,13 +425,15 @@ static void mainLoop( void )
         argDrawMode2D( vpR );
         argDrawImage( dataPtrR );
         
-        copyImage( dataPtrL, (ARUint8 *)calibImageL->imageData, xsizeL*ysizeL, pixFormatL );
-        cornerFlagL = cvFindChessboardCorners(calibImageL, cvSize(chessboardCornerNumY,chessboardCornerNumX),
-                                              cornersL, &cornerCountL, CV_CALIB_CB_ADAPTIVE_THRESH|CV_CALIB_CB_FILTER_QUADS );
+        copyImage( dataPtrL, calibImageL.data, xsizeL*ysizeL, pixFormatL );
+        cornerFlagL = cv::findChessboardCorners(calibImageL, cv::Size(chessboardCornerNumY,chessboardCornerNumX),
+                                                cornersL, cv::CALIB_CB_ADAPTIVE_THRESH|cv::CALIB_CB_FILTER_QUADS );
+        cornerCountL = (int)cornersL.size();
         
-        copyImage( dataPtrR, (ARUint8 *)calibImageR->imageData, xsizeR*ysizeR, pixFormatR );
-        cornerFlagR = cvFindChessboardCorners(calibImageR, cvSize(chessboardCornerNumY,chessboardCornerNumX),
-                                              cornersR, &cornerCountR, CV_CALIB_CB_ADAPTIVE_THRESH|CV_CALIB_CB_FILTER_QUADS );
+        copyImage( dataPtrR, calibImageR.data, xsizeR*ysizeR, pixFormatR );
+        cornerFlagR = cv::findChessboardCorners(calibImageR, cv::Size(chessboardCornerNumY,chessboardCornerNumX),
+                                                cornersR, cv::CALIB_CB_ADAPTIVE_THRESH|cv::CALIB_CB_FILTER_QUADS );
+        cornerCountR = (int)cornersR.size();
         
         argDrawMode2D( vpL );
         if(cornerFlagL) glColor3f(1.0f, 0.0f, 0.0f);

@@ -74,6 +74,7 @@
 
 #include <AR/ar.h>
 #include <AR/arMulti.h>
+#include <AR/paramGL.h>
 #include <AR/video.h>
 #include <AR/gsub_lite.h>
 #include <AR2/tracking.h>
